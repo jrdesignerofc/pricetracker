@@ -2,7 +2,7 @@
 
 on:
   schedule:
-    - cron: "*/30 * * * *"  # a cada 30 minutos (UTC)
+    - cron: "*/30 * * * *"  # roda a cada 30min (UTC)
   workflow_dispatch: {}
 
 jobs:
@@ -12,6 +12,11 @@ jobs:
       - name: Call Vercel cron endpoint
         run: |
           set -e
+          if [ -z "" ]; then
+            echo "❌ PROD_URL não configurado em GitHub Secrets"
+            exit 1
+          fi
+          echo "🔗 Chamando: /api/cron/fetch-prices"
           curl -fsSL "/api/cron/fetch-prices" || exit 1
         env:
           PROD_URL: ${{ secrets.PROD_URL }}
