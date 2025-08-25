@@ -1,2 +1,46 @@
-export const dynamic = 'force-dynamic';
-export const dynamic = 'force-dynamic'; // app/page.tsx  (agora lê do banco) import Link from "next/link"; import { prisma } from "@/lib/prisma";  export default async function HomePage() {   const products = await prisma.product.findMany({     where: { isActive: true },     orderBy: { createdAt: "desc" },     take: 100,   });    return (     <section className="space-y-4">       <h1 className="text-2xl font-bold">PriceTracker — produtos</h1>       <p className="text-neutral-700">Listagem vinda do Postgres (Neon) via Prisma.</p>        <div className="rounded-xl border bg-white p-4">         {products.length === 0 ? (           <p className="text-neutral-600">Nenhum produto cadastrado ainda.</p>         ) : (           <ul className="list-disc pl-6 space-y-1">             {products.map((p) => (               <li key={p.id}>                 <Link href={`/product/${p.id}`} className="text-blue-600 hover:underline">                   {p.name} — {p.store}                 </Link>               </li>             ))}           </ul>         )}         <p className="text-sm text-neutral-500 mt-3">           Dica: use <code>POST /api/products</code> para cadastrar novos itens.         </p>       </div>     </section>   ); }
+﻿export const dynamic = "force-dynamic";
+
+import Link from "next/link";
+import { prisma } from "@/lib/prisma";
+
+export default async function HomePage() {
+  const products = await prisma.product.findMany({
+    where: { isActive: true },
+    orderBy: { createdAt: "desc" },
+    take: 100,
+  });
+
+  return (
+    <section className="space-y-4">
+      <h1 className="text-2xl font-bold">PriceTracker — produtos</h1>
+      <p className="text-neutral-700">
+        Listagem vinda do Postgres (Neon) via Prisma.
+      </p>
+
+      <div className="rounded-xl border bg-white p-4">
+        {products.length === 0 ? (
+          <p className="text-neutral-600">
+            Nenhum produto cadastrado ainda.
+          </p>
+        ) : (
+          <ul className="list-disc pl-6 space-y-1">
+            {products.map((p) => (
+              <li key={p.id}>
+                <Link
+                  href={`/product/${p.id}`}
+                  className="text-blue-600 hover:underline"
+                >
+                  {p.name} — {p.store}
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
+
+        <p className="text-sm text-neutral-500 mt-3">
+          Dica: use <code>POST /api/products</code> para cadastrar novos itens.
+        </p>
+      </div>
+    </section>
+  );
+}
