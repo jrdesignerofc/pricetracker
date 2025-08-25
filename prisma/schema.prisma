@@ -1,0 +1,41 @@
+// prisma/schema.prisma
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Store {
+  KABUM
+  TERABYTE
+  PICHAU
+}
+
+model Product {
+  id           String         @id @default(cuid())
+  name         String
+  store        Store
+  url          String         @unique
+  sku          String?        @db.VarChar(64)
+  isActive     Boolean        @default(true)
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  priceHistory PriceHistory[]
+
+  @@index([store, isActive])
+}
+
+model PriceHistory {
+  id           String   @id @default(cuid())
+  productId    String
+  priceDecimal Decimal  @db.Decimal(10, 2)
+  currency     String   @default("BRL")
+  collectedAt  DateTime @default(now())
+  product      Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId, collectedAt])
+  @@unique([productId, collectedAt])
+}
