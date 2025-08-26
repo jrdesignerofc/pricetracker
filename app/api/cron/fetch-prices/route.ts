@@ -2,7 +2,7 @@
 export const dynamic = "force-dynamic"; // força execução no server (sem cache de página)
 
 import { NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { prisma } from "../../../../lib/prisma"; // 👈 trocado de "@/lib/prisma" para relativo
 
 // ===== Config =====
 const RATE_LIMIT_MS = Number(process.env.RATE_LIMIT_MS ?? 15000); // ≥15s por domínio
@@ -63,19 +63,19 @@ async function callStoreScraper(
 
   switch (store.toUpperCase()) {
     case "KABUM": {
-      const mod = await import("@/lib/scrapers/kabum");
+      const mod = await import("../../../../lib/scrapers/kabum"); // 👈 relativo
       const fn = pickScraperFn(mod, candidates);
       if (!fn) throw new Error("kabum scraper export not found");
       return await fn(url);
     }
     case "TERABYTE": {
-      const mod = await import("@/lib/scrapers/terabyte");
+      const mod = await import("../../../../lib/scrapers/terabyte"); // 👈 relativo
       const fn = pickScraperFn(mod, candidates);
       if (!fn) throw new Error("terabyte scraper export not found");
       return await fn(url);
     }
     case "PICHAU": {
-      const mod = await import("@/lib/scrapers/pichau");
+      const mod = await import("../../../../lib/scrapers/pichau"); // 👈 relativo
       const fn = pickScraperFn(mod, candidates);
       if (!fn) throw new Error("pichau scraper export not found");
       return await fn(url);
