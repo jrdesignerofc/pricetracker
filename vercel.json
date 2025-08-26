@@ -1,8 +1,1 @@
-﻿{
-  "functions": {
-    "app/api/cron/fetch-prices/route.ts": {
-      "memory": 512,
-      "maxDuration": 60
-    }
-  }
-}
+{ "functions": { "app/api/cron/fetch-prices/route.ts": { "memory": 512, "maxDuration": 60 } } }

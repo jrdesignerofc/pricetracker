@@ -1,48 +1,36 @@
-﻿// lib/scrapers/pichau.ts (troque o conteÃºdo da funÃ§Ã£o para usar normalize e utils)
+﻿// lib/scrapers/pichau.ts
 import * as cheerio from "cheerio";
 import { parseBRL } from "../price";
 import { fetchWithRetry } from "../http";
-import { parsePriceFromNextData, parsePriceFromAnyScript, normalizePrice } from "./utils";
+import { parsePriceFromNextData, parsePriceFromAnyScript } from "./utils";
 
-export async function scrapePichauPrice(productUrl: string): Promise<{ price: number; currency: "BRL" }> {
-  const { html } = await fetchWithRetry(productUrl);
+export async function scrapePichauPrice(url: string): Promise<{ price: number; currency?: string }> {
+  const { html } = await fetchWithRetry(url, {
+    headers: { "User-Agent": process.env.SCRAPER_USER_AGENT || "PriceTrackerBot/1.0" },
+    timeoutMs: 12000,
+    retries: 2,
+  });
+
   const $ = cheerio.load(html);
 
-  // 1) JSON-LD
-  const jsonLd: number[] = [];
-  $('script[type="application/ld+json"]').each((_, el) => {
-    try {
-      const data = JSON.parse($(el).contents().text());
-      const arr = Array.isArray(data) ? data : [data];
-      for (const item of arr) {
-        const price = item?.offers?.price ?? item?.offers?.lowPrice ?? item?.price;
-        const num = typeof price === "string" ? Number(price.replace(",", ".")) : Number(price);
-        const cand = normalizePrice(Number.isFinite(num) ? num : null);
-        if (cand) jsonLd.push(cand);
-      }
-    } catch {}
-  });
-  if (jsonLd.length > 0) return { price: jsonLd[0], currency: "BRL" };
-
-  // 2) __NEXT_DATA__
-  const nd = normalizePrice(parsePriceFromNextData($));
-  if (nd) return { price: nd, currency: "BRL" };
-
-  // 3) HTML
-  const candidates = [
-    $(".price, .final-price, .product-price, [data-price], [data-testid='price']").first().text(),
-    $("[data-price]").attr("data-price") ?? "",
-    $("[class*='preco'] [class*='valor']").first().text(),
-  ].filter(Boolean);
-
-  for (const raw of candidates) {
-    const cand = normalizePrice(parseBRL(raw));
-    if (cand) return { price: cand, currency: "BRL" };
+  const fromJson = parsePriceFromNextData($) ?? parsePriceFromAnyScript($);
+  if (typeof fromJson === "number" && Number.isFinite(fromJson)) {
+    return { price: fromJson, currency: "BRL" };
   }
 
-  // 4) scripts genÃ©ricos
-  const any = normalizePrice(parsePriceFromAnyScript($));
-  if (any) return { price: any, currency: "BRL" };
+  const metaPrice = $("meta[itemprop='price']").attr("content")?.trim();
+  const text =
+    $(".product-price").first().text().trim() ||
+    $(".finalPrice").first().text().trim() ||
+    metaPrice;
 
-  throw new Error("PRICE_NOT_FOUND");
+  if (text) {
+    const raw = metaPrice ? Number(text.replace(",", ".")) : parseBRL(text); // number | null
+    const value = typeof raw === "number" ? raw : NaN;
+    if (Number.isFinite(value)) return { price: value, currency: "BRL" };
+  }
+
+  throw new Error("price-not-found-pichau");
 }
+
+export default scrapePichauPrice;

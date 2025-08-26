@@ -1,50 +1,36 @@
 ﻿// lib/scrapers/kabum.ts
 import * as cheerio from "cheerio";
-import { parseBRL } from "@/lib/price";
-import { fetchWithRetry } from "@/lib/http";
+import { parseBRL } from "../price";
+import { fetchWithRetry } from "../http";
 import { parsePriceFromNextData, parsePriceFromAnyScript } from "./utils";
 
-export async function scrapeKabumPrice(productUrl: string): Promise<{ price: number; currency: "BRL" }> {
-  const { html } = await fetchWithRetry(productUrl);
+export async function scrapeKabumPrice(url: string): Promise<{ price: number; currency?: string }> {
+  const { html } = await fetchWithRetry(url, {
+    headers: { "User-Agent": process.env.SCRAPER_USER_AGENT || "PriceTrackerBot/1.0" },
+    timeoutMs: 12000,
+    retries: 2,
+  });
+
   const $ = cheerio.load(html);
 
-  // 1) JSON-LD
-  const jsonLdPrices: number[] = [];
-  $('script[type="application/ld+json"]').each((_, el) => {
-    try {
-      const data = JSON.parse($(el).contents().text());
-      const arr = Array.isArray(data) ? data : [data];
-      for (const item of arr) {
-        const price = item?.offers?.price ?? item?.offers?.lowPrice ?? item?.price;
-        if (typeof price === "string") {
-          const n = Number(price.replace(",", "."));
-          if (Number.isFinite(n)) jsonLdPrices.push(n);
-        } else if (typeof price === "number") {
-          jsonLdPrices.push(price);
-        }
-      }
-    } catch {}
-  });
-  if (jsonLdPrices.length > 0) return { price: jsonLdPrices[0], currency: "BRL" };
-
-  // 2) __NEXT_DATA__
-  const nd = parsePriceFromNextData($);
-  if (nd) return { price: nd, currency: "BRL" };
-
-  // 3) Seletores HTML tÃ­picos
-  const candidates = [
-    $(".finalPrice, .price__value, .product-price, [data-testid='price-value'], [data-price]").first().text(),
-    $("[data-price]").attr("data-price") ?? "",
-    $("[class*='price'] [class*='value']").first().text(),
-  ].filter(Boolean);
-  for (const text of candidates) {
-    const n = parseBRL(text);
-    if (n) return { price: n, currency: "BRL" };
+  const fromJson = parsePriceFromNextData($) ?? parsePriceFromAnyScript($);
+  if (typeof fromJson === "number" && Number.isFinite(fromJson)) {
+    return { price: fromJson, currency: "BRL" };
   }
 
-  // 4) Fallback: qualquer <script> com "price":
-  const any = parsePriceFromAnyScript($);
-  if (any) return { price: any, currency: "BRL" };
+  // Fallback por seletor (ajuste se necessário)
+  let text =
+    $("span.price__current").first().text().trim() ||
+    $("strong.finalPrice").first().text().trim() ||
+    $("div.priceCard > strong").first().text().trim();
 
-  throw new Error("PRICE_NOT_FOUND");
+  if (text) {
+    const parsed = parseBRL(text); // number | null
+    const value = typeof parsed === "number" ? parsed : NaN;
+    if (Number.isFinite(value)) return { price: value, currency: "BRL" };
+  }
+
+  throw new Error("price-not-found-kabum");
 }
+
+export default scrapeKabumPrice;

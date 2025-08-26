@@ -1,6 +1,6 @@
-// app/api/products/route.ts
+﻿// app/api/products/route.ts
 import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
+import { prisma } from "../../../lib/prisma";
 import { z } from "zod";
 
 const StoreEnum = z.enum(["KABUM", "TERABYTE", "PICHAU"]);
@@ -58,3 +58,4 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: false, error: "INTERNAL_ERROR" }, { status: 500 });
   }
 }
+

@@ -1,7 +1,7 @@
 ﻿export const dynamic = "force-dynamic";
 
 import Link from "next/link";
-import { prisma } from "@/lib/prisma";
+import { prisma } from "../lib/prisma";
 
 export default async function HomePage() {
   const products = await prisma.product.findMany({

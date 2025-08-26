@@ -1,0 +1,11 @@
+﻿name = "price-tracker-cron"
+main = "src/index.ts"
+compatibility_date = "2024-01-01"
+
+[triggers]
+crons = ["* * * * *"] # a cada minuto
+
+[vars]
+TARGET_URL = "https://pricetracker-161hibllf-gilson-juniors-projects-8acb7cc0.vercel.app/api/cron/fetch-prices"
+SLOTS = "6"
+BATCH_SIZE = "10"

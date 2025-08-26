@@ -1,9 +1,9 @@
 // app/product/[id]/page.tsx
 export const dynamic = "force-dynamic";
 
-import { prisma } from "@/lib/prisma";
+import { prisma } from "../../../lib/prisma";
 import { notFound } from "next/navigation";
-import PriceChart from "@/components/PriceChart";
+import PriceChart from "../../../components/PriceChart";
 
 function formatBRL(value: number | null | undefined) {
   if (value == null) return "—";
@@ -27,17 +27,8 @@ export default async function Page({ params }: { params: { id: string } }) {
     take: 200,
   });
 
-  const last = history.length ? history[history.length - 1] : undefined;
+  const last = history.at(-1) ?? null;
   const lastPrice = last ? Number(last.priceDecimal) : null;
-
-  // Pontos para o gráfico
-  const points = history.map((h) => ({
-    t:
-      h.collectedAt instanceof Date
-        ? h.collectedAt.getTime()
-        : new Date(h.collectedAt).getTime(),
-    v: Number(h.priceDecimal),
-  }));
 
   return (
     <main className="space-y-6">
@@ -67,7 +58,12 @@ export default async function Page({ params }: { params: { id: string } }) {
         ) : (
           <>
             {/* Gráfico */}
-            <PriceChart points={points} />
+            <PriceChart
+              points={history.map((h) => ({
+                t: new Date(h.collectedAt).getTime(),
+                v: Number(h.priceDecimal),
+              }))}
+            />
 
             {/* Tabela */}
             <div className="overflow-x-auto">
