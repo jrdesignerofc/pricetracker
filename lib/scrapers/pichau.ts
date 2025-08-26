@@ -1,4 +1,4 @@
-// lib/scrapers/pichau.ts (troque o conteúdo da função para usar normalize e utils)
+﻿// lib/scrapers/pichau.ts (troque o conteÃºdo da funÃ§Ã£o para usar normalize e utils)
 import * as cheerio from "cheerio";
 import { parseBRL } from "../price";
 import { fetchWithRetry } from "../http";
@@ -40,7 +40,7 @@ export async function scrapePichauPrice(productUrl: string): Promise<{ price: nu
     if (cand) return { price: cand, currency: "BRL" };
   }
 
-  // 4) scripts genéricos
+  // 4) scripts genÃ©ricos
   const any = normalizePrice(parsePriceFromAnyScript($));
   if (any) return { price: any, currency: "BRL" };
 

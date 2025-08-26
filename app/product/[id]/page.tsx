@@ -30,7 +30,7 @@ export default async function Page({ params }: { params: { id: string } }) {
   const last = history.length ? history[history.length - 1] : undefined;
   const lastPrice = last ? Number(last.priceDecimal) : null;
 
-  // Pontos para o gráfico (client component)
+  // Pontos para o gráfico
   const points = history.map((h) => ({
     t:
       h.collectedAt instanceof Date
@@ -50,9 +50,7 @@ export default async function Page({ params }: { params: { id: string } }) {
         <p className="text-sm text-neutral-600">
           Último preço: <strong>{formatBRL(lastPrice)}</strong>{" "}
           {last?.collectedAt
-            ? `(coletado em ${new Date(last.collectedAt).toLocaleString(
-                "pt-BR",
-              )})`
+            ? `(coletado em ${new Date(last.collectedAt).toLocaleString("pt-BR")})`
             : "(sem histórico ainda)"}
         </p>
       </header>

@@ -1,4 +1,4 @@
-// lib/scrapers/kabum.ts
+﻿// lib/scrapers/kabum.ts
 import * as cheerio from "cheerio";
 import { parseBRL } from "@/lib/price";
 import { fetchWithRetry } from "@/lib/http";
@@ -31,7 +31,7 @@ export async function scrapeKabumPrice(productUrl: string): Promise<{ price: num
   const nd = parsePriceFromNextData($);
   if (nd) return { price: nd, currency: "BRL" };
 
-  // 3) Seletores HTML típicos
+  // 3) Seletores HTML tÃ­picos
   const candidates = [
     $(".finalPrice, .price__value, .product-price, [data-testid='price-value'], [data-price]").first().text(),
     $("[data-price]").attr("data-price") ?? "",

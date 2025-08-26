@@ -1,77 +1,155 @@
-// app/api/cron/fetch-prices/route.ts  (ATUALIZADO para 3 lojas)
+// app/api/cron/fetch-prices/route.ts
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { scrapeKabumPrice } from "@/lib/scrapers/kabum";
-import { scrapeTerabytePrice } from "@/lib/scrapers/terabyte";
-import { scrapePichauPrice } from "@/lib/scrapers/pichau";
 
-const MIN_DELAY_MS = Number(process.env.SCRAPE_MIN_DELAY_MS ?? 12000);
+// Config
+const RATE_LIMIT_MS = Number(process.env.RATE_LIMIT_MS ?? 15000); // 15s por domínio
+const RETRIES = Number(process.env.SCRAPE_RETRIES ?? 3);
+const ALLOW_DUPLICATE_MINUTES = Number(process.env.ALLOW_DUPLICATE_MINUTES ?? 60);
 
-export const dynamic = "force-dynamic";
+// Utils
+function sleep(ms: number) {
+  return new Promise((r) => setTimeout(r, ms));
+}
 
-export async function GET() {
-  const startedAt = Date.now();
-  const results: Array<{ productId: string; ok: boolean; price?: number; error?: string }> = [];
-
-  try {
-    const items = await prisma.product.findMany({
-      where: { isActive: true, store: { in: ["KABUM", "TERABYTE", "PICHAU"] } },
-      orderBy: { createdAt: "asc" },
-      take: 45, // limite de segurança
-    });
-
-    const groups = {
-      KABUM: items.filter((p) => p.store === "KABUM"),
-      TERABYTE: items.filter((p) => p.store === "TERABYTE"),
-      PICHAU: items.filter((p) => p.store === "PICHAU"),
-    };
-
-    for (const store of Object.keys(groups) as Array<keyof typeof groups>) {
-      const list = groups[store];
-      for (let i = 0; i < list.length; i++) {
-        const p = list[i];
-        const t0 = Date.now();
-        try {
-          let priceInfo: { price: number; currency: "BRL" };
-          if (p.store === "KABUM") priceInfo = await scrapeKabumPrice(p.url);
-          else if (p.store === "TERABYTE") priceInfo = await scrapeTerabytePrice(p.url);
-          else if (p.store === "PICHAU") priceInfo = await scrapePichauPrice(p.url);
-          else throw new Error("STORE_NOT_SUPPORTED");
-
-          await prisma.priceHistory.create({
-            data: {
-              productId: p.id,
-              priceDecimal: priceInfo.price,
-              currency: priceInfo.currency,
-              collectedAt: new Date(),
-            },
-          });
-
-          results.push({ productId: p.id, ok: true, price: priceInfo.price });
-        } catch (err: any) {
-          console.error(`Falha ao coletar ${p.name} (${p.url}):`, err?.message ?? err);
-          results.push({ productId: p.id, ok: false, error: String(err?.message ?? err) });
-        } finally {
-          const elapsed = Date.now() - t0;
-          if (i < list.length - 1 && elapsed < MIN_DELAY_MS) {
-            await sleep(MIN_DELAY_MS - elapsed);
-          }
-        }
-      }
+async function retry<T>(fn: () => Promise<T>, attempts = 3, baseDelay = 500) {
+  let lastErr: any;
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return await fn();
+    } catch (e) {
+      lastErr = e;
+      const delay = baseDelay * Math.pow(2, i);
+      await sleep(delay);
     }
+  }
+  throw lastErr;
+}
 
-    return NextResponse.json({
-      ok: true,
-      count: results.length,
-      tookMs: Date.now() - startedAt,
-      results,
-    });
-  } catch (err) {
-    console.error("CRON fetch-prices erro:", err);
-    return NextResponse.json({ ok: false, error: "INTERNAL_ERROR" }, { status: 500 });
+// Detecta automaticamente a função exportada no módulo do scraper.
+// Aceita várias convenções: scrapeKabumPrice, scrapePrice, scrape, getPrice, extractPrice.
+function pickScraperFn(mod: any, candidates: string[]) {
+  for (const name of candidates) {
+    const fn = mod?.[name];
+    if (typeof fn === "function") return fn;
+  }
+  // default export?
+  if (typeof mod?.default === "function") return mod.default;
+  return null;
+}
+
+async function callStoreScraper(store: string, url: string): Promise<{ price?: number | null; currency?: string | null }> {
+  const candidates = ["scrapeKabumPrice", "scrapeTerabytePrice", "scrapePichauPrice", "scrapePrice", "scrape", "getPrice", "extractPrice"];
+
+  switch (store.toUpperCase()) {
+    case "KABUM": {
+      const mod = await import("@/lib/scrapers/kabum");
+      const fn = pickScraperFn(mod, candidates);
+      if (!fn) throw new Error("kabum scraper export not found");
+      return await fn(url);
+    }
+    case "TERABYTE": {
+      const mod = await import("@/lib/scrapers/terabyte");
+      const fn = pickScraperFn(mod, candidates);
+      if (!fn) throw new Error("terabyte scraper export not found");
+      return await fn(url);
+    }
+    case "PICHAU": {
+      const mod = await import("@/lib/scrapers/pichau");
+      const fn = pickScraperFn(mod, candidates);
+      if (!fn) throw new Error("pichau scraper export not found");
+      return await fn(url);
+    }
+    default:
+      throw new Error(`store not supported: ${store}`);
   }
 }
 
-function sleep(ms: number) {
-  return new Promise((r) => setTimeout(r, ms));
+type Result = {
+  productId: string;
+  ok: boolean;
+  inserted?: boolean;
+  skipped?: boolean;
+  reason?: string;
+};
+
+export async function GET() {
+  try {
+    const products = await prisma.product.findMany({ where: { isActive: true } });
+
+    const lastRequestPerDomain = new Map<string, number>();
+    const results: Result[] = [];
+
+    for (const product of products) {
+      // valida URL
+      let parsed: URL | null = null;
+      try {
+        parsed = new URL(product.url);
+      } catch {
+        results.push({ productId: product.id, ok: false, reason: "invalid-url" });
+        continue;
+      }
+
+      // rate-limit por domínio
+      const domain = parsed.hostname;
+      const lastAt = lastRequestPerDomain.get(domain) ?? 0;
+      const wait = RATE_LIMIT_MS - (Date.now() - lastAt);
+      if (wait > 0) await sleep(wait);
+      lastRequestPerDomain.set(domain, Date.now());
+
+      // scrape com retry
+      try {
+        const scraped = await retry(
+          () => callStoreScraper(String(product.store), product.url),
+          RETRIES,
+          500
+        );
+
+        const priceNumber =
+          scraped && typeof scraped.price === "number" && !Number.isNaN(scraped.price)
+            ? Number(scraped.price)
+            : NaN;
+
+        if (!Number.isFinite(priceNumber)) {
+          results.push({ productId: product.id, ok: false, reason: "no-price-found" });
+          continue;
+        }
+
+        // deduplicação: pular se mesmo preço e muito recente
+        const lastRow = await prisma.priceHistory.findFirst({
+          where: { productId: product.id },
+          orderBy: { collectedAt: "desc" },
+        });
+
+        if (lastRow) {
+          const lastPrice = Number(lastRow.priceDecimal);
+          const minutesSince = (Date.now() - new Date(lastRow.collectedAt).getTime()) / 1000 / 60;
+          if (lastPrice === priceNumber && minutesSince < ALLOW_DUPLICATE_MINUTES) {
+            results.push({ productId: product.id, ok: true, skipped: true });
+            continue;
+          }
+        }
+
+        // inserir ponto novo
+        await prisma.priceHistory.create({
+          data: {
+            productId: product.id,
+            priceDecimal: priceNumber,
+            currency: scraped?.currency ?? "BRL",
+            collectedAt: new Date(),
+          },
+        });
+
+        results.push({ productId: product.id, ok: true, inserted: true });
+      } catch (err: any) {
+        console.error(`Error scraping product ${product.id}:`, err);
+        results.push({ productId: product.id, ok: false, reason: String(err?.message ?? err) });
+      }
+    }
+
+    return NextResponse.json({ ok: true, results }, { status: 200 });
+  } catch (err: any) {
+    console.error("Cron fetch-prices failed:", err);
+    return NextResponse.json({ ok: false, error: String(err?.message ?? err) }, { status: 500 });
+  }
 }

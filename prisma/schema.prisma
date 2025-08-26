@@ -36,6 +36,19 @@ model PriceHistory {
   collectedAt  DateTime @default(now())
   product      Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
 
-  @@index([productId, collectedAt])
   @@unique([productId, collectedAt])
+  @@index([productId, collectedAt])
+}
+
+model FetchCache {
+  id           String   @id @default(cuid())
+  url          String   @unique
+  etag         String?
+  lastModified String?
+  statusCode   Int?
+  bodyHash     String? // opcional: hash simples do corpo
+  updatedAt    DateTime @updatedAt
+  createdAt    DateTime @default(now())
+
+  @@index([url])
 }

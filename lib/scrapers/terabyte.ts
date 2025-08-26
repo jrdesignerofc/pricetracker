@@ -1,11 +1,11 @@
-// lib/scrapers/terabyte.ts
+﻿// lib/scrapers/terabyte.ts
 import * as cheerio from "cheerio";
 import { parseBRL } from "../price";
 import { fetchWithRetry } from "../http";
 
 /**
- * Extrai o preço da página de produto da Terabyte.
- * Estratégia:
+ * Extrai o preÃ§o da pÃ¡gina de produto da Terabyte.
+ * EstratÃ©gia:
  * 1) JSON-LD (schema.org) -> offers.price / lowPrice
  * 2) Seletores comuns no HTML
  * 3) TODO: ajustar seletor real se layout mudar (inspecione no DevTools)
@@ -36,7 +36,7 @@ export async function scrapeTerabytePrice(productUrl: string): Promise<{ price: 
     if (Number.isFinite(p)) return { price: p, currency: "BRL" };
   }
 
-  // 2) Seletores HTML (exemplos prováveis; ajuste conforme a página real)
+  // 2) Seletores HTML (exemplos provÃ¡veis; ajuste conforme a pÃ¡gina real)
   const candidates = [
     $(".preco-promocional, .price, .product-price, [data-price]").first().text(),
     $("[data-price]").attr("data-price") ?? "",
@@ -48,6 +48,6 @@ export async function scrapeTerabytePrice(productUrl: string): Promise<{ price: 
     if (n) return { price: n, currency: "BRL" };
   }
 
-  // 3) TODO: substituir por seletor real se necessário
+  // 3) TODO: substituir por seletor real se necessÃ¡rio
   throw new Error("PRICE_NOT_FOUND");
 }
