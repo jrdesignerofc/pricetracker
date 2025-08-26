@@ -1,15 +1,8 @@
-// vercel.json
-{
+﻿{
   "functions": {
     "app/api/cron/fetch-prices/route.ts": {
       "memory": 512,
       "maxDuration": 60
     }
-  },
-  "crons": [
-    {
-      "path": "/api/cron/fetch-prices",
-      "schedule": "0 * * * *"
-    }
-  ]
+  }
 }
