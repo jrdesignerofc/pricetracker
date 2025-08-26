@@ -1,16 +1,14 @@
 // app/admin/cron-status/page.tsx
 export const dynamic = "force-dynamic";
 
-import { prisma } from "@/lib/prisma";
+import { prisma } from "../../../lib/prisma"; // <- trocado de "@/lib/prisma" para relativo
 
 export default async function Page() {
   const rows = await prisma.priceHistory.findMany({
     orderBy: { collectedAt: "desc" },
     take: 50,
     include: {
-      product: {
-        select: { id: true, name: true, store: true, url: true },
-      },
+      product: { select: { id: true, name: true, store: true, url: true } },
     },
   });
 
@@ -77,8 +75,7 @@ export default async function Page() {
       </div>
 
       <p className="text-xs text-neutral-500">
-        Dica: ajuste a frequência no <code>vercel.json</code> ou no painel da Vercel
-        (Project &rarr; Settings &rarr; Cron Jobs).
+        Dica: ajuste a frequência no <code>worker/wrangler.toml</code> (SLOTS/BATCH_SIZE).
       </p>
     </main>
   );
