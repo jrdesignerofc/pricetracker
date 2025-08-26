@@ -1,47 +1,60 @@
 // app/api/price-history/route.ts
-import { NextRequest, NextResponse } from "next/server";
-import { prisma } from "@/lib/prisma";
-import { priceHistoryQuerySchema } from "@/lib/validation";
-
 export const dynamic = "force-dynamic";
 
+import { NextRequest, NextResponse } from "next/server";
+import { prisma } from "../../../lib/prisma";            // <= relativo
+import { priceHistoryQuerySchema } from "../../../lib/validation"; // <= relativo
+
+function json(data: any, status = 200) {
+  return NextResponse.json(data, {
+    status,
+    headers: { "Cache-Control": "no-store" },
+  });
+}
+
+/**
+ * GET /api/price-history?productId=...&days=30
+ * Retorna histórico do produto (mais antigo -> mais novo)
+ */
 export async function GET(req: NextRequest) {
   try {
-    const { searchParams } = new URL(req.url);
-    const productId = searchParams.get("productId") ?? "";
-    const days = searchParams.get("days") ?? undefined;
+    const url = new URL(req.url);
+    const productId = url.searchParams.get("productId");
+    const daysParam = url.searchParams.get("days");
 
-    const parsed = priceHistoryQuerySchema.safeParse({ productId, days });
+    // validação com zod (schema do projeto)
+    const parsed = priceHistoryQuerySchema.safeParse({
+      productId,
+      days: daysParam ? Number(daysParam) : undefined,
+    });
     if (!parsed.success) {
-      return NextResponse.json(
-        { ok: false, error: "VALIDATION_ERROR", details: parsed.error.flatten() },
-        { status: 400 }
-      );
+      return json({ ok: false, error: "invalid-query", details: parsed.error.flatten() }, 400);
+    }
+    const { days } = parsed.data;
+
+    const where: any = { productId: productId! };
+    if (days && Number.isFinite(days) && days > 0) {
+      const from = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+      where.collectedAt = { gte: from };
     }
 
-    const since = parsed.data.days
-      ? new Date(Date.now() - parsed.data.days * 24 * 60 * 60 * 1000)
-      : new Date(0);
-
     const rows = await prisma.priceHistory.findMany({
-      where: {
-        productId: parsed.data.productId,
-        collectedAt: { gte: since },
-      },
+      where,
       orderBy: { collectedAt: "asc" },
-      take: 2000,
+      take: 200,
     });
 
-    // Normaliza payload para o Chart.js no futuro
-    const data = rows.map((r) => ({
-      collectedAt: r.collectedAt.toISOString(),
-      price: Number(r.priceDecimal),
-      currency: r.currency,
+    // normaliza para o cliente
+    const points = rows.map((r) => ({
+      t: new Date(r.collectedAt).getTime(),
+      v: Number(r.priceDecimal),
+      currency: r.currency || "BRL",
+      id: r.id,
     }));
 
-    return NextResponse.json({ ok: true, data });
-  } catch (err) {
-    console.error("GET /api/price-history erro:", err);
-    return NextResponse.json({ ok: false, error: "INTERNAL_ERROR" }, { status: 500 });
+    return json({ ok: true, productId, count: points.length, points }, 200);
+  } catch (err: any) {
+    console.error("price-history GET failed:", err);
+    return json({ ok: false, error: String(err?.message ?? err) }, 500);
   }
 }
