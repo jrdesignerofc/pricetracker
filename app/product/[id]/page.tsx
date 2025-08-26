@@ -27,8 +27,17 @@ export default async function Page({ params }: { params: { id: string } }) {
     take: 200,
   });
 
-  const last = history.at(-1);
-  const lastPrice = last?.price ?? null;
+  const last = history.length ? history[history.length - 1] : undefined;
+  const lastPrice = last ? Number(last.priceDecimal) : null;
+
+  // Pontos para o gráfico (client component)
+  const points = history.map((h) => ({
+    t:
+      h.collectedAt instanceof Date
+        ? h.collectedAt.getTime()
+        : new Date(h.collectedAt).getTime(),
+    v: Number(h.priceDecimal),
+  }));
 
   return (
     <main className="space-y-6">
@@ -41,7 +50,9 @@ export default async function Page({ params }: { params: { id: string } }) {
         <p className="text-sm text-neutral-600">
           Último preço: <strong>{formatBRL(lastPrice)}</strong>{" "}
           {last?.collectedAt
-            ? `(coletado em ${new Date(last.collectedAt).toLocaleString("pt-BR")})`
+            ? `(coletado em ${new Date(last.collectedAt).toLocaleString(
+                "pt-BR",
+              )})`
             : "(sem histórico ainda)"}
         </p>
       </header>
@@ -58,12 +69,7 @@ export default async function Page({ params }: { params: { id: string } }) {
         ) : (
           <>
             {/* Gráfico */}
-            <PriceChart
-              points={history.map((h) => ({
-                t: new Date(h.collectedAt).getTime(),
-                v: Number(h.price),
-              }))}
-            />
+            <PriceChart points={points} />
 
             {/* Tabela */}
             <div className="overflow-x-auto">
@@ -80,7 +86,9 @@ export default async function Page({ params }: { params: { id: string } }) {
                       <td className="py-2 pr-4">
                         {new Date(h.collectedAt).toLocaleString("pt-BR")}
                       </td>
-                      <td className="py-2">{formatBRL(h.price)}</td>
+                      <td className="py-2">
+                        {formatBRL(Number(h.priceDecimal))}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
