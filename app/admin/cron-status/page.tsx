@@ -1,14 +1,15 @@
 // app/admin/cron-status/page.tsx
 export const dynamic = "force-dynamic";
 
-import { prisma } from "../../../lib/prisma"; // <- trocado de "@/lib/prisma" para relativo
+import { prisma } from "../../../lib/prisma";
+import { formatDatePT } from "../../../lib/format";
 
 export default async function Page() {
   const rows = await prisma.priceHistory.findMany({
     orderBy: { collectedAt: "desc" },
     take: 50,
     include: {
-      product: { select: { id: true, name: true, store: true, url: true } },
+      product: { select: { id: true, name: true, store: true, url: true, lastCheckedAt: true } },
     },
   });
 
@@ -17,10 +18,11 @@ export default async function Page() {
       <h1 className="text-2xl font-bold">Status das Coletas (últimas 50)</h1>
 
       <div className="overflow-x-auto">
-        <table className="min-w-[720px] text-sm">
+        <table className="min-w-[900px] text-sm">
           <thead>
             <tr className="text-left border-b">
-              <th className="py-2 pr-4">Quando</th>
+              <th className="py-2 pr-4">Quando (coletado)</th>
+              <th className="py-2 pr-4">Última verificação</th>
               <th className="py-2 pr-4">Produto</th>
               <th className="py-2 pr-4">Loja</th>
               <th className="py-2 pr-4">Preço</th>
@@ -30,9 +32,8 @@ export default async function Page() {
           <tbody>
             {rows.map((r) => (
               <tr key={r.id} className="border-b last:border-none">
-                <td className="py-2 pr-4">
-                  {new Date(r.collectedAt).toLocaleString("pt-BR")}
-                </td>
+                <td className="py-2 pr-4">{formatDatePT(r.collectedAt)}</td>
+                <td className="py-2 pr-4">{formatDatePT(r.product?.lastCheckedAt)}</td>
                 <td className="py-2 pr-4">
                   <a
                     href={`/product/${r.productId}`}
@@ -62,7 +63,7 @@ export default async function Page() {
             ))}
             {rows.length === 0 && (
               <tr>
-                <td colSpan={5} className="py-6 text-neutral-500">
+                <td colSpan={6} className="py-6 text-neutral-500">
                   Sem dados ainda. Rode o cron manualmente:{" "}
                   <code className="bg-neutral-100 px-1 py-0.5 rounded">
                     /api/cron/fetch-prices

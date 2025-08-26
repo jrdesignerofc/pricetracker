@@ -4,6 +4,7 @@ export const dynamic = "force-dynamic";
 import { prisma } from "../../../lib/prisma";
 import { notFound } from "next/navigation";
 import PriceChart from "../../../components/PriceChart";
+import { formatDatePT } from "../../../lib/format";
 
 function formatBRL(value: number | null | undefined) {
   if (value == null) return "—";
@@ -37,18 +38,13 @@ export default async function Page({ params }: { params: { id: string } }) {
         <p className="text-neutral-700 break-all">{product.url}</p>
 
         <p className="text-sm text-neutral-600">
-          Última verificação:{" "}
-          <strong>
-            {product.lastCheckedAt
-              ? new Date(product.lastCheckedAt).toLocaleString("pt-BR")
-              : "—"}
-          </strong>
+          Última verificação: <strong>{formatDatePT(product.lastCheckedAt)}</strong>
         </p>
 
         <p className="text-sm text-neutral-600">
           Último preço: <strong>{formatBRL(lastPrice)}</strong>{" "}
           {last?.collectedAt
-            ? `(coletado em ${new Date(last.collectedAt).toLocaleString("pt-BR")})`
+            ? `(coletado em ${formatDatePT(last.collectedAt)})`
             : "(sem histórico ainda)"}
         </p>
       </header>
@@ -84,9 +80,7 @@ export default async function Page({ params }: { params: { id: string } }) {
                 <tbody>
                   {history.map((h) => (
                     <tr key={h.id} className="border-b last:border-none">
-                      <td className="py-2 pr-4">
-                        {new Date(h.collectedAt).toLocaleString("pt-BR")}
-                      </td>
+                      <td className="py-2 pr-4">{formatDatePT(h.collectedAt)}</td>
                       <td className="py-2">{formatBRL(Number(h.priceDecimal))}</td>
                     </tr>
                   ))}
