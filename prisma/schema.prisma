@@ -15,17 +15,19 @@ enum Store {
 }
 
 model Product {
-  id           String         @id @default(cuid())
-  name         String
-  store        Store
-  url          String         @unique
-  sku          String?        @db.VarChar(64)
-  isActive     Boolean        @default(true)
-  createdAt    DateTime       @default(now())
-  updatedAt    DateTime       @updatedAt
-  priceHistory PriceHistory[]
+  id            String         @id @default(cuid())
+  name          String
+  store         Store
+  url           String         @unique
+  sku           String?        @db.VarChar(64)
+  isActive      Boolean        @default(true)
+  lastCheckedAt DateTime?      // <-- NOVO: última verificação (pode ser null se nunca checou)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  priceHistory  PriceHistory[]
 
   @@index([store, isActive])
+  @@index([lastCheckedAt])     // útil para diagnósticos/listagens
 }
 
 model PriceHistory {
@@ -36,8 +38,8 @@ model PriceHistory {
   collectedAt  DateTime @default(now())
   product      Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
 
-  @@unique([productId, collectedAt])
   @@index([productId, collectedAt])
+  @@unique([productId, collectedAt])
 }
 
 model FetchCache {
@@ -46,7 +48,7 @@ model FetchCache {
   etag         String?
   lastModified String?
   statusCode   Int?
-  bodyHash     String? // opcional: hash simples do corpo
+  bodyHash     String?
   updatedAt    DateTime @updatedAt
   createdAt    DateTime @default(now())
 

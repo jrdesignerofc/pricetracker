@@ -11,7 +11,6 @@ function formatBRL(value: number | null | undefined) {
 }
 
 export default async function Page({ params }: { params: { id: string } }) {
-  // Produto
   const product = await prisma.product.findUnique({
     where: { id: params.id },
   });
@@ -20,7 +19,6 @@ export default async function Page({ params }: { params: { id: string } }) {
     notFound();
   }
 
-  // Histórico (mais antigo -> mais novo)
   const history = await prisma.priceHistory.findMany({
     where: { productId: params.id },
     orderBy: { collectedAt: "asc" },
@@ -37,6 +35,15 @@ export default async function Page({ params }: { params: { id: string } }) {
           {product.name} — {product.store}
         </h1>
         <p className="text-neutral-700 break-all">{product.url}</p>
+
+        <p className="text-sm text-neutral-600">
+          Última verificação:{" "}
+          <strong>
+            {product.lastCheckedAt
+              ? new Date(product.lastCheckedAt).toLocaleString("pt-BR")
+              : "—"}
+          </strong>
+        </p>
 
         <p className="text-sm text-neutral-600">
           Último preço: <strong>{formatBRL(lastPrice)}</strong>{" "}
@@ -80,9 +87,7 @@ export default async function Page({ params }: { params: { id: string } }) {
                       <td className="py-2 pr-4">
                         {new Date(h.collectedAt).toLocaleString("pt-BR")}
                       </td>
-                      <td className="py-2">
-                        {formatBRL(Number(h.priceDecimal))}
-                      </td>
+                      <td className="py-2">{formatBRL(Number(h.priceDecimal))}</td>
                     </tr>
                   ))}
                 </tbody>
